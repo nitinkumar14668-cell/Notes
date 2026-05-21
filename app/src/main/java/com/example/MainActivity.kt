@@ -40,6 +40,14 @@ import java.util.*
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        val oldHandler = Thread.getDefaultUncaughtExceptionHandler()
+        var caughtException by mutableStateOf<Throwable?>(null)
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            caughtException = e
+            // oldHandler?.uncaughtException(t, e) // Mute to allow UI to render conditionally if needed, but it's better to just do this for debugging
+        }
+
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -47,15 +55,25 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: NoteViewModel = viewModel(
-                        factory = object : ViewModelProvider.Factory {
-                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                                @Suppress("UNCHECKED_CAST")
-                                return NoteViewModel(application) as T
+                    if (caughtException != null) {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(32.dp)) {
+                            item {
+                                Text(text = "App Crashed!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.headlineMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(text = caughtException?.stackTraceToString() ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                    )
-                    NoteSyncApp(viewModel)
+                    } else {
+                        val viewModel: NoteViewModel = viewModel(
+                            factory = object : ViewModelProvider.Factory {
+                                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                    @Suppress("UNCHECKED_CAST")
+                                    return NoteViewModel(application) as T
+                                }
+                            }
+                        )
+                        NoteSyncApp(viewModel)
+                    }
                 }
             }
         }
@@ -90,7 +108,7 @@ fun NoteListScreen(viewModel: NoteViewModel, onNavigateToNote: (Int?) -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Note Sync", fontWeight = FontWeight.Bold) },
+                title = { Text("Note", fontWeight = FontWeight.Bold) },
                 actions = {
                     IconButton(onClick = { viewModel.simulateSync() }, modifier = Modifier.testTag("sync_button")) {
                         Icon(Icons.Filled.Sync, contentDescription = "Sync Now")

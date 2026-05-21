@@ -12,7 +12,7 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     private val db = Room.databaseBuilder(
         application,
         NoteDatabase::class.java, "note-sync-db"
-    ).build()
+    ).fallbackToDestructiveMigration().build()
 
     private val repository = NoteRepository(db.noteDao())
 

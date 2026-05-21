@@ -1,5 +1,5 @@
 {
-  "name": "Note Sync",
+  "name": "Note",
   "description": "Collaborative cloud-synced notes app (simulated backend)",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
