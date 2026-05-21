@@ -33,7 +33,7 @@ jobs:
         run: cp .env.example .env
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace --no-daemon --no-configuration-cache -Dorg.gradle.jvmargs="-Xmx4g"
+        run: gradle assembleDebug --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC" -Pkotlin.daemon.jvmargs="-Xmx1g"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
