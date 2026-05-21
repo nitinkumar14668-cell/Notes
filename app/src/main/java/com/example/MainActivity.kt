@@ -64,8 +64,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } else {
-                        val viewModel: NoteViewModel = viewModel() // Use default factory
-                        NoteSyncApp(viewModel)
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val application = context.applicationContext as android.app.Application
+                    val viewModel: NoteViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                @Suppress("UNCHECKED_CAST")
+                                return NoteViewModel(application) as T
+                            }
+                        }
+                    )
+                    NoteSyncApp(viewModel)
                     }
                 }
             }
