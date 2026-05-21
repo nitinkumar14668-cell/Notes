@@ -3,6 +3,7 @@ package com.example
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels // Added this just in case
@@ -49,14 +50,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: NoteViewModel = viewModel(
-                        factory = object : ViewModelProvider.Factory {
-                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                                @Suppress("UNCHECKED_CAST")
-                                return NoteViewModel(application) as T
-                            }
-                        }
-                    )
+                    val viewModel: NoteViewModel = viewModel() // Use default factory
                     NoteSyncApp(viewModel)
                 }
             }
@@ -145,7 +139,7 @@ fun NoteCard(note: Note, onClick: () -> Unit, onDelete: () -> Unit) {
                 } else {
                     Icon(Icons.Filled.CloudOff, contentDescription = "Not Synced", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.size(24.dp).padding(start = 8.dp)) {
+                IconButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
                 }
             }
@@ -159,7 +153,7 @@ fun NoteCard(note: Note, onClick: () -> Unit, onDelete: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(Date(note.timestamp)),
+                text = SimpleDateFormat("MMM dd, yyyy", Locale.US).format(Date(note.timestamp)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
@@ -181,17 +175,23 @@ fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
     var showComments by remember { mutableStateOf(false) }
     var newCommentText by remember { mutableStateOf("") }
     
+    val saveAndPop = {
+        if (title.isNotEmpty() || content.isNotEmpty()) {
+            viewModel.saveNote(currentNote?.id, title, content)
+        }
+        onNavigateBack()
+    }
+    
+    BackHandler {
+        saveAndPop()
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(if (currentNote == null) "New Note" else "Edit Note") },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (title.isNotEmpty() || content.isNotEmpty()) {
-                            viewModel.saveNote(currentNote?.id, title, content)
-                        }
-                        onNavigateBack()
-                    }, modifier = Modifier.testTag("back_button")) {
+                    IconButton(onClick = saveAndPop, modifier = Modifier.testTag("back_button")) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -273,7 +273,7 @@ fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
                         items(versions) { version ->
                             Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                                 Column(modifier = Modifier.padding(8.dp)) {
-                                    Text(SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.getDefault()).format(Date(version.timestamp)), style = MaterialTheme.typography.labelSmall)
+                                    Text(SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.US).format(Date(version.timestamp)), style = MaterialTheme.typography.labelSmall)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(version.content, style = MaterialTheme.typography.bodySmall, maxLines = 4, overflow = TextOverflow.Ellipsis)
                                 }
