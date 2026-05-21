@@ -43,6 +43,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        var caughtException by mutableStateOf<Throwable?>(null)
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            caughtException = e
+        }
+
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -50,8 +55,18 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: NoteViewModel = viewModel() // Use default factory
-                    NoteSyncApp(viewModel)
+                    if (caughtException != null) {
+                        LazyColumn(modifier = Modifier.fillMaxSize().padding(32.dp)) {
+                            item {
+                                Text(text = "App Crashed!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.headlineMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(text = caughtException?.stackTraceToString() ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    } else {
+                        val viewModel: NoteViewModel = viewModel() // Use default factory
+                        NoteSyncApp(viewModel)
+                    }
                 }
             }
         }
