@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,13 +42,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        val oldHandler = Thread.getDefaultUncaughtExceptionHandler()
-        var caughtException by mutableStateOf<Throwable?>(null)
-        Thread.setDefaultUncaughtExceptionHandler { t, e ->
-            caughtException = e
-            // oldHandler?.uncaughtException(t, e) // Mute to allow UI to render conditionally if needed, but it's better to just do this for debugging
-        }
-
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
@@ -55,25 +49,15 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (caughtException != null) {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(32.dp)) {
-                            item {
-                                Text(text = "App Crashed!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.headlineMedium)
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text(text = caughtException?.stackTraceToString() ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    val viewModel: NoteViewModel = viewModel(
+                        factory = object : ViewModelProvider.Factory {
+                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                                @Suppress("UNCHECKED_CAST")
+                                return NoteViewModel(application) as T
                             }
                         }
-                    } else {
-                        val viewModel: NoteViewModel = viewModel(
-                            factory = object : ViewModelProvider.Factory {
-                                override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                                    @Suppress("UNCHECKED_CAST")
-                                    return NoteViewModel(application) as T
-                                }
-                            }
-                        )
-                        NoteSyncApp(viewModel)
-                    }
+                    )
+                    NoteSyncApp(viewModel)
                 }
             }
         }
@@ -275,7 +259,7 @@ fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
                                     newCommentText = ""
                                 }
                             }) {
-                                Icon(Icons.Filled.Send, contentDescription = "Send")
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
                             }
                         }
                     )

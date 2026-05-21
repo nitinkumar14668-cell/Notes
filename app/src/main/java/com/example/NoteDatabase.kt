@@ -71,6 +71,25 @@ interface NoteDao {
 @Database(entities = [Note::class, NoteVersion::class, NoteComment::class], version = 2, exportSchema = false)
 abstract class NoteDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
+    
+    companion object {
+        @Volatile
+        private var INSTANCE: NoteDatabase? = null
+
+        fun getDatabase(context: android.content.Context): NoteDatabase {
+            return INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    NoteDatabase::class.java,
+                    "note-sync-db"
+                )
+                .fallbackToDestructiveMigration(dropAllTables = true)
+                .build()
+                INSTANCE = instance
+                instance
+            }
+        }
+    }
 }
 
 class NoteRepository(private val noteDao: NoteDao) {

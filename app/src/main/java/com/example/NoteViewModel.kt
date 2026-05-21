@@ -9,10 +9,7 @@ import kotlinx.coroutines.launch
 
 class NoteViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val db = Room.databaseBuilder(
-        application,
-        NoteDatabase::class.java, "note-sync-db"
-    ).fallbackToDestructiveMigration().build()
+    private val db = NoteDatabase.getDatabase(application)
 
     private val repository = NoteRepository(db.noteDao())
 
