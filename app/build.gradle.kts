@@ -108,6 +108,7 @@ dependencies {
   implementation(libs.converter.moshi)
   // implementation(libs.firebase.ai)
   implementation(libs.kotlinx.coroutines.android)
+  implementation(libs.play.services.ads)
   implementation(libs.kotlinx.coroutines.core)
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)

@@ -4,8 +4,10 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels // Added this just in case
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -39,14 +41,19 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
+import com.google.android.gms.ads.MobileAds
+
 class MainActivity : ComponentActivity() {
+    private lateinit var networkObserver: NetworkConnectivityObserver
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        var caughtException by mutableStateOf<Throwable?>(null)
-        Thread.setDefaultUncaughtExceptionHandler { _, e ->
-            caughtException = e
-        }
+        MobileAds.initialize(this) {}
+        AdHelper.loadRewardedAd(this)
+        AdHelper.loadInterstitialAd(this)
+        
+        networkObserver = NetworkConnectivityObserver(this)
 
         enableEdgeToEdge()
         setContent {
@@ -55,26 +62,20 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (caughtException != null) {
-                        LazyColumn(modifier = Modifier.fillMaxSize().padding(32.dp)) {
-                            item {
-                                Text(text = "App Crashed!", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.headlineMedium)
+                    val isConnected by networkObserver.isConnected.collectAsStateWithLifecycle()
+                    
+                    if (!isConnected) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Filled.WifiOff, contentDescription = null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.error)
                                 Spacer(modifier = Modifier.height(16.dp))
-                                Text(text = caughtException?.stackTraceToString() ?: "", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                Text("No Internet Connection", style = MaterialTheme.typography.headlineMedium)
+                                Text("Please connect to the internet to use the app.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     } else {
-                    val context = androidx.compose.ui.platform.LocalContext.current
-                    val application = context.applicationContext as android.app.Application
-                    val viewModel: NoteViewModel = viewModel(
-                        factory = object : ViewModelProvider.Factory {
-                            override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                                @Suppress("UNCHECKED_CAST")
-                                return NoteViewModel(application) as T
-                            }
-                        }
-                    )
-                    NoteSyncApp(viewModel)
+                        val viewModel: NoteViewModel = viewModel()
+                        NoteSyncApp(viewModel, this@MainActivity)
                     }
                 }
             }
@@ -83,18 +84,25 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun NoteSyncApp(viewModel: NoteViewModel) {
+fun NoteSyncApp(viewModel: NoteViewModel, activity: ComponentActivity) {
     val navController = rememberNavController()
 
     NavHost(navController = navController, startDestination = "note_list") {
         composable("note_list") {
-            NoteListScreen(viewModel, onNavigateToNote = {
-                viewModel.selectNote(it)
-                navController.navigate("note_detail")
+            NoteListScreen(viewModel, activity, onNavigateToNote = { noteId ->
+                if (noteId == null) {
+                    AdHelper.showRewardedAd(activity) {
+                        viewModel.selectNote(null)
+                        navController.navigate("note_detail")
+                    }
+                } else {
+                    viewModel.selectNote(noteId)
+                    navController.navigate("note_detail")
+                }
             })
         }
         composable("note_detail") {
-            NoteDetailScreen(viewModel, onNavigateBack = {
+            NoteDetailScreen(viewModel, activity, onNavigateBack = {
                 navController.popBackStack()
             })
         }
@@ -103,7 +111,7 @@ fun NoteSyncApp(viewModel: NoteViewModel) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteListScreen(viewModel: NoteViewModel, onNavigateToNote: (Int?) -> Unit) {
+fun NoteListScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNavigateToNote: (Int?) -> Unit) {
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     
@@ -187,7 +195,7 @@ fun NoteCard(note: Note, onClick: () -> Unit, onDelete: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
+fun NoteDetailScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNavigateBack: () -> Unit) {
     val currentNote by viewModel.currentNote.collectAsStateWithLifecycle()
     val versions by viewModel.currentNoteVersions.collectAsStateWithLifecycle()
     val comments by viewModel.currentNoteComments.collectAsStateWithLifecycle()
@@ -209,6 +217,15 @@ fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
     BackHandler {
         saveAndPop()
     }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf"),
+        onResult = { uri ->
+            uri?.let {
+                PdfHelper.generatePdf(activity, title, content, it)
+            }
+        }
+    )
     
     Scaffold(
         topBar = {
@@ -220,6 +237,22 @@ fun NoteDetailScreen(viewModel: NoteViewModel, onNavigateBack: () -> Unit) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        AdHelper.showInterstitialAd(activity) {
+                            if (title.isNotEmpty() || content.isNotEmpty()) {
+                                viewModel.saveNote(currentNote?.id, title, content)
+                            }
+                        }
+                    }) {
+                        Icon(Icons.Filled.Save, contentDescription = "Save")
+                    }
+                    IconButton(onClick = {
+                        AdHelper.showInterstitialAd(activity) {
+                            createDocumentLauncher.launch("${title.ifEmpty { "Note" }}.pdf")
+                        }
+                    }) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = "Export PDF")
+                    }
                     if (currentNote != null) {
                         IconButton(onClick = { showComments = !showComments; showVersions = false }, modifier = Modifier.testTag("comments_button")) {
                             Icon(if (showComments) Icons.Filled.ChatBubble else Icons.Filled.ChatBubbleOutline, contentDescription = "Comments")
