@@ -49,6 +49,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        Thread.setDefaultUncaughtExceptionHandler { _, e ->
+            Log.e("FATAL_APP_CRASH", "Uncaught exception", e)
+        }
+
         MobileAds.initialize(this) {}
         AdHelper.loadRewardedAd(this)
         AdHelper.loadInterstitialAd(this)
@@ -91,10 +95,8 @@ fun NoteSyncApp(viewModel: NoteViewModel, activity: ComponentActivity) {
         composable("note_list") {
             NoteListScreen(viewModel, activity, onNavigateToNote = { noteId ->
                 if (noteId == null) {
-                    AdHelper.showRewardedAd(activity) {
-                        viewModel.selectNote(null)
-                        navController.navigate("note_detail")
-                    }
+                    viewModel.selectNote(null)
+                    navController.navigate("note_detail")
                 } else {
                     viewModel.selectNote(noteId)
                     navController.navigate("note_detail")
@@ -115,6 +117,16 @@ fun NoteListScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNavi
     val notes by viewModel.notes.collectAsStateWithLifecycle()
     val coroutineScope = rememberCoroutineScope()
     
+    var pendingNavigationNoteId by remember { mutableStateOf<Int?>(null) }
+    var navigateNow by remember { mutableStateOf(false) }
+
+    if (navigateNow) {
+        LaunchedEffect(Unit) {
+            onNavigateToNote(pendingNavigationNoteId)
+            navigateNow = false
+        }
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -127,7 +139,12 @@ fun NoteListScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNavi
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onNavigateToNote(null) }, modifier = Modifier.testTag("add_note_fab")) {
+            FloatingActionButton(onClick = { 
+                AdHelper.showRewardedAd(activity) {
+                    pendingNavigationNoteId = null
+                    navigateNow = true
+                }
+            }, modifier = Modifier.testTag("add_note_fab")) {
                 Icon(Icons.Filled.Add, contentDescription = "New Note")
             }
         }
@@ -227,6 +244,14 @@ fun NoteDetailScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNa
         }
     )
     
+    var pendingPdfExport by remember { mutableStateOf(false) }
+    if (pendingPdfExport) {
+        LaunchedEffect(Unit) {
+            createDocumentLauncher.launch("${title.ifEmpty { "Note" }}.pdf")
+            pendingPdfExport = false
+        }
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -248,7 +273,7 @@ fun NoteDetailScreen(viewModel: NoteViewModel, activity: ComponentActivity, onNa
                     }
                     IconButton(onClick = {
                         AdHelper.showInterstitialAd(activity) {
-                            createDocumentLauncher.launch("${title.ifEmpty { "Note" }}.pdf")
+                            pendingPdfExport = true
                         }
                     }) {
                         Icon(Icons.Filled.PictureAsPdf, contentDescription = "Export PDF")
