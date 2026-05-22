@@ -34,13 +34,28 @@ jobs:
       - name: Create dummy .env
         run: cp .env.example .env
 
-      - name: Build debug APK
-        run: gradle assembleDebug --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC" -Pkotlin.daemon.jvmargs="-Xmx1g"
+      - name: Build Release APK and Bundle
+        run: gradle assembleRelease bundleRelease --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx3g -XX:+UseG1GC" -Pkotlin.daemon.jvmargs="-Xmx1g"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+
+      - name: Update tag
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa latest -m "Latest Build"
+          git push origin latest --force
 
       - name: Create/Update Latest Release
         if: github.event_name == 'workflow_dispatch'
@@ -48,10 +63,18 @@ jobs:
         with:
           tag_name: latest
           name: Latest Build
-          files: app/build/outputs/apk/debug/app-debug.apk
+          make_latest: true
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
+          body: "Auto-generated latest build artifacts."
+          draft: false
+          prerelease: false
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/app-debug.apk
+          files: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/bundle/release/app-release.aab
