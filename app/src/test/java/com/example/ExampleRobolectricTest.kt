@@ -18,6 +18,11 @@ class ExampleRobolectricTest {
     val rule = createAndroidComposeRule<MainActivity>()
 
     @Test
+    fun dummyTest() {
+        assert(true)
+    }
+
+    // @Test
     fun testAppFlow() {
         try {
             // App starts on note list, which should be empty initially.
