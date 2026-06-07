@@ -22,18 +22,37 @@ object AdHelper {
     private var rewardedAd: RewardedAd? = null
     private var interstitialAd: InterstitialAd? = null
 
+    private var isRewardedAdLoading = false
+    private var isInterstitialAdLoading = false
+
+    private var rewardedRetryCount = 0
+    private var interstitialRetryCount = 0
+    private const val MAX_RETRY_COUNT = 5
+
     fun loadRewardedAd(context: Context) {
-        if (rewardedAd != null) return
+        if (rewardedAd != null || isRewardedAdLoading) return
+        isRewardedAdLoading = true
         val adRequest = AdRequest.Builder().build()
         RewardedAd.load(context, REWARDED_AD_UNIT_ID, adRequest, object : RewardedAdLoadCallback() {
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                Log.d(TAG, adError.toString())
+                Log.d(TAG, "Rewarded ad failed to load: ${adError.message}")
                 rewardedAd = null
+                isRewardedAdLoading = false
+
+                if (rewardedRetryCount < MAX_RETRY_COUNT) {
+                    rewardedRetryCount++
+                    Log.d(TAG, "Retrying rewarded ad load in 5s (attempt $rewardedRetryCount)...")
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        loadRewardedAd(context)
+                    }, 5000L)
+                }
             }
 
             override fun onAdLoaded(ad: RewardedAd) {
-                Log.d(TAG, "Rewarded Ad was loaded.")
+                Log.d(TAG, "Rewarded Ad was loaded successfully.")
                 rewardedAd = ad
+                isRewardedAdLoading = false
+                rewardedRetryCount = 0
             }
         })
     }
@@ -49,7 +68,7 @@ object AdHelper {
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    Log.d(TAG, "Ad failed to show.")
+                    Log.d(TAG, "Ad failed to show: ${adError.message}")
                     rewardedAd = null
                     onAdCompleteOrFailed()
                 }
@@ -70,17 +89,29 @@ object AdHelper {
     }
 
     fun loadInterstitialAd(context: Context) {
-        if (interstitialAd != null) return
+        if (interstitialAd != null || isInterstitialAdLoading) return
+        isInterstitialAdLoading = true
         val adRequest = AdRequest.Builder().build()
         InterstitialAd.load(context, INTERSTITIAL_AD_UNIT_ID, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                Log.d(TAG, adError.toString())
+                Log.d(TAG, "Interstitial ad failed to load: ${adError.message}")
                 interstitialAd = null
+                isInterstitialAdLoading = false
+
+                if (interstitialRetryCount < MAX_RETRY_COUNT) {
+                    interstitialRetryCount++
+                    Log.d(TAG, "Retrying interstitial ad load in 5s (attempt $interstitialRetryCount)...")
+                    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                        loadInterstitialAd(context)
+                    }, 5000L)
+                }
             }
 
             override fun onAdLoaded(ad: InterstitialAd) {
-                Log.d(TAG, "Interstitial Ad was loaded.")
+                Log.d(TAG, "Interstitial Ad was loaded successfully.")
                 interstitialAd = ad
+                isInterstitialAdLoading = false
+                interstitialRetryCount = 0
             }
         })
     }
@@ -96,7 +127,7 @@ object AdHelper {
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    Log.d(TAG, "Ad failed to show.")
+                    Log.d(TAG, "Ad failed to show: ${adError.message}")
                     interstitialAd = null
                     onAdCompleteOrFailed()
                 }

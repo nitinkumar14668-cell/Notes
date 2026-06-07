@@ -53,9 +53,11 @@ class MainActivity : ComponentActivity() {
             Log.e("FATAL_APP_CRASH", "Uncaught exception", e)
         }
 
-        MobileAds.initialize(this) {}
-        AdHelper.loadRewardedAd(this)
-        AdHelper.loadInterstitialAd(this)
+        MobileAds.initialize(this) { status ->
+            Log.d("AdMob", "AdMob initialized successfully: $status")
+            AdHelper.loadRewardedAd(this)
+            AdHelper.loadInterstitialAd(this)
+        }
         
         networkObserver = NetworkConnectivityObserver(this)
 
